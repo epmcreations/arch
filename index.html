@@ -1,0 +1,1853 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Arch - Secure Sharing</title>
+    <link
+      rel="icon"
+      type="image/x-icon"
+      href="https://i.imgur.com/MXRKJST.png"
+    />
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <!-- PeerJS for P2P connections -->
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
+    <style>
+      * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+          -webkit-tap-highlight-color: transparent;
+      }
+
+      :root {
+          --primary-bg: #000000;
+          --secondary-bg: #111111;
+          --tertiary-bg: #222222;
+          --text-color: #ffffff;
+          --accent-color: #3a3a3a;
+          --grey-text: #aaaaaa;
+          --success-color: #3b93c3;
+          --danger-color: #ef4444;
+          --border-radius: 12px;
+          --spacing-sm: 8px;
+          --spacing-md: 16px;
+          --spacing-lg: 24px;
+          --header-height: 60px;
+          --nav-height: 70px;
+      }
+
+      body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+          background-color: var(--primary-bg);
+          color: var(--text-color);
+          overflow-x: hidden;
+          height: 100vh;
+          max-width: 100vw;
+          position: relative;
+      }
+
+      #app {
+          height: 100vh;
+          display: flex;
+          flex-direction: column;
+          position: relative;
+      }
+
+      /* Header */
+      .header {
+          height: var(--header-height);
+          background-color: var(--primary-bg);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 var(--spacing-md);
+          border-bottom: 1px solid var(--tertiary-bg);
+          position: sticky;
+          top: 0;
+          z-index: 10;
+      }
+
+      .logo-container {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-sm);
+      }
+
+      .logo {
+          width: 30px;
+          height: 30px;
+          border-radius: 6px;
+      }
+
+      .app-name {
+          font-size: 1.5rem;
+          font-weight: 700;
+          letter-spacing: 0.5px;
+      }
+
+      /* Main Content */
+      .main-content {
+          flex: 1;
+          overflow-y: auto;
+          padding-bottom: var(--nav-height);
+      }
+
+      .page {
+          display: none;
+          height: 100%;
+          padding: var(--spacing-md);
+      }
+
+      .page.active {
+          display: block;
+      }
+
+      /* Navigation */
+      .nav {
+          height: var(--nav-height);
+          background-color: var(--primary-bg);
+          border-top: 1px solid var(--tertiary-bg);
+          display: flex;
+          align-items: center;
+          justify-content: space-around;
+          position: fixed;
+          bottom: 0;
+          width: 100%;
+          z-index: 10;
+      }
+
+      .nav-btn {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: 4px;
+          background: none;
+          border: none;
+          color: var(--text-color);
+          font-size: 0.75rem;
+          padding: var(--spacing-sm);
+          border-radius: var(--border-radius);
+          transition: all 0.2s ease;
+          cursor: pointer;
+          width: 70px;
+      }
+
+      .nav-btn.active {
+          color: var(--success-color);
+      }
+
+      .nav-btn i {
+          font-size: 1.25rem;
+      }
+
+      .nav-btn:hover {
+          background-color: var(--tertiary-bg);
+      }
+
+      /* Share Page */
+      .share-options {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: calc(100% - 40px);
+          gap: var(--spacing-lg);
+      }
+
+      .share-btn {
+          width: 200px;
+          height: 200px;
+          border-radius: 50%;
+          background-color: var(--secondary-bg);
+          border: 3px solid var(--tertiary-bg);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          gap: var(--spacing-md);
+          cursor: pointer;
+          transition: all 0.3s ease;
+      }
+
+      .share-btn:hover {
+          transform: scale(1.03);
+          border-color: var(--success-color);
+      }
+
+      .share-btn i {
+          font-size: 3rem;
+      }
+
+      .share-btn-text {
+          font-size: 1.2rem;
+          font-weight: 600;
+      }
+
+      /* Connection Code */
+      .code-container {
+          background-color: var(--secondary-bg);
+          border-radius: var(--border-radius);
+          padding: var(--spacing-lg);
+          margin-top: var(--spacing-lg);
+          text-align: center;
+          display: none;
+      }
+
+      .code-container.active {
+          display: block;
+      }
+
+      .code-label {
+          font-size: 0.9rem;
+          color: var(--grey-text);
+          margin-bottom: var(--spacing-sm);
+      }
+
+      .connection-code {
+          font-size: 2rem;
+          font-weight: 700;
+          letter-spacing: 4px;
+          background-color: var(--primary-bg);
+          padding: var(--spacing-md);
+          border-radius: var(--border-radius);
+          margin: var(--spacing-md) 0;
+          font-family: monospace;
+      }
+
+      .input-container {
+          margin-top: var(--spacing-md);
+      }
+
+      .code-input {
+          width: 100%;
+          padding: var(--spacing-md);
+          background-color: var(--primary-bg);
+          border: 1px solid var(--tertiary-bg);
+          border-radius: var(--border-radius);
+          color: var(--text-color);
+          font-size: 1.2rem;
+          text-align: center;
+          letter-spacing: 3px;
+          font-family: monospace;
+          margin-bottom: var(--spacing-md);
+      }
+
+      .action-btn {
+          width: 100%;
+          padding: var(--spacing-md);
+          background-color: var(--tertiary-bg);
+          border: none;
+          border-radius: var(--border-radius);
+          color: var(--text-color);
+          font-size: 1rem;
+          font-weight: 600;
+          cursor: pointer;
+          transition: background-color 0.2s;
+      }
+
+      .action-btn:hover {
+          background-color: var(--accent-color);
+      }
+
+      .action-btn.primary {
+          background-color: var(--success-color);
+      }
+
+      .action-btn.primary:hover {
+          background-color: #0da271;
+      }
+
+      .action-btn.danger {
+          background-color: var(--danger-color);
+      }
+
+      .action-btn.danger:hover {
+          background-color: #dc2626;
+      }
+
+      /* Chat Interface */
+      .chat-container {
+          display: none;
+          flex-direction: column;
+          height: 100%;
+      }
+
+      .chat-container.active {
+          display: flex;
+      }
+
+      .chat-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding-bottom: var(--spacing-md);
+          border-bottom: 1px solid var(--tertiary-bg);
+          margin-bottom: var(--spacing-md);
+      }
+
+      .peer-info {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-md);
+      }
+
+      .peer-avatar {
+          width: 40px;
+          height: 40px;
+          border-radius: 50%;
+          background-color: var(--tertiary-bg);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: 600;
+      }
+
+      .messages-container {
+          flex: 1;
+          overflow-y: auto;
+          padding: var(--spacing-md) 0;
+          display: flex;
+          flex-direction: column;
+          gap: var(--spacing-md);
+      }
+
+      .message {
+          max-width: 80%;
+          padding: var(--spacing-md);
+          border-radius: var(--border-radius);
+          display: flex;
+          flex-direction: column;
+          position: relative;
+      }
+
+      .message.received {
+          align-self: flex-start;
+          background-color: var(--secondary-bg);
+          border-top-left-radius: 4px;
+      }
+
+      .message.sent {
+          align-self: flex-end;
+          background-color: var(--success-color);
+          border-top-right-radius: 4px;
+      }
+
+      .message-sender {
+          font-size: 0.8rem;
+          font-weight: 600;
+          margin-bottom: 4px;
+      }
+
+      .message-text {
+          word-break: break-word;
+      }
+
+      .message-file {
+          display: flex;
+          flex-direction: column;
+          align-items: flex-start;
+          cursor: pointer;
+          padding: var(--spacing-md);
+          border-radius: var(--border-radius);
+          background-color: var(--tertiary-bg);
+          transition: background-color 0.2s;
+      }
+
+      .message-file:hover {
+          background-color: var(--accent-color);
+      }
+
+      .file-info {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-md);
+          width: 100%;
+      }
+
+      .file-icon {
+          font-size: 1.5rem;
+      }
+
+      .file-details {
+          flex: 1;
+      }
+
+      .file-name {
+          font-weight: 600;
+          margin-bottom: 2px;
+      }
+
+      .file-type {
+          font-size: 0.8rem;
+          color: var(--grey-text);
+          text-transform: uppercase;
+      }
+
+      .file-size {
+          font-size: 0.8rem;
+          color: var(--grey-text);
+      }
+
+      .chat-input-container {
+          display: flex;
+          gap: var(--spacing-sm);
+          padding-top: var(--spacing-md);
+          border-top: 1px solid var(--tertiary-bg);
+      }
+
+      .chat-input {
+          flex: 1;
+          padding: var(--spacing-md);
+          background-color: var(--secondary-bg);
+          border: 1px solid var(--tertiary-bg);
+          border-radius: var(--border-radius);
+          color: var(--text-color);
+          font-size: 1rem;
+      }
+
+      .chat-send-btn, .file-attach-btn {
+          width: 50px;
+          height: 50px;
+          border-radius: 50%;
+          background-color: var(--tertiary-bg);
+          border: none;
+          color: var(--text-color);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: background-color 0.2s;
+      }
+
+      .chat-send-btn:hover, .file-attach-btn:hover {
+          background-color: var(--accent-color);
+      }
+
+      .chat-send-btn i, .file-attach-btn i {
+          font-size: 1.2rem;
+      }
+
+      /* File Upload Modal */
+      .modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background-color: rgba(0, 0, 0, 0.8);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 100;
+          display: none;
+      }
+
+      .modal-overlay.active {
+          display: flex;
+      }
+
+      .modal {
+          background-color: var(--secondary-bg);
+          border-radius: var(--border-radius);
+          width: 90%;
+          max-width: 500px;
+          max-height: 80vh;
+          overflow-y: auto;
+          padding: var(--spacing-lg);
+      }
+
+      .modal-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: var(--spacing-lg);
+      }
+
+      .modal-title {
+          font-size: 1.3rem;
+          font-weight: 600;
+      }
+
+      .close-btn {
+          background: none;
+          border: none;
+          color: var(--text-color);
+          font-size: 1.5rem;
+          cursor: pointer;
+      }
+
+      .file-list {
+          display: flex;
+          flex-direction: column;
+          gap: var(--spacing-md);
+          margin-bottom: var(--spacing-lg);
+          max-height: 300px;
+          overflow-y: auto;
+      }
+
+      .file-item {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: var(--spacing-md);
+          background-color: var(--primary-bg);
+          border-radius: var(--border-radius);
+      }
+
+      .file-item-info {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-md);
+      }
+
+      .remove-file-btn {
+          background: none;
+          border: none;
+          color: var(--danger-color);
+          cursor: pointer;
+          font-size: 1.2rem;
+      }
+
+      /* Vault Page */
+      .vault-header {
+          display: flex;
+          gap: var(--spacing-md);
+          margin-bottom: var(--spacing-lg);
+      }
+
+      .vault-tab {
+          padding: var(--spacing-md) var(--spacing-lg);
+          background-color: var(--secondary-bg);
+          border: none;
+          border-radius: var(--border-radius);
+          color: var(--text-color);
+          font-weight: 600;
+          cursor: pointer;
+          transition: all 0.2s;
+          flex: 1;
+      }
+
+      .vault-tab.active {
+          background-color: var(--success-color);
+      }
+
+      .vault-content {
+          min-height: 60vh;
+      }
+
+      .gallery {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: var(--spacing-md);
+      }
+
+      .gallery-item {
+          aspect-ratio: 1;
+          border-radius: var(--border-radius);
+          overflow: hidden;
+          background-color: var(--secondary-bg);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          position: relative;
+          cursor: pointer;
+      }
+
+      .gallery-item img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+      }
+
+      .gallery-item i {
+          font-size: 2rem;
+          color: var(--grey-text);
+      }
+
+      .add-file-btn {
+          position: fixed;
+          bottom: calc(var(--nav-height) + var(--spacing-lg));
+          right: var(--spacing-lg);
+          width: 60px;
+          height: 60px;
+          border-radius: 50%;
+          background-color: var(--success-color);
+          border: none;
+          color: var(--text-color);
+          font-size: 1.5rem;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+          z-index: 5;
+      }
+
+      /* Settings Page */
+      .profile-section {
+          background-color: var(--secondary-bg);
+          border-radius: var(--border-radius);
+          padding: var(--spacing-lg);
+          margin-bottom: var(--spacing-lg);
+      }
+
+      .profile-header {
+          display: flex;
+          align-items: center;
+          gap: var(--spacing-lg);
+          margin-bottom: var(--spacing-lg);
+      }
+
+      .profile-avatar {
+          width: 80px;
+          height: 80px;
+          border-radius: 50%;
+          background-color: var(--tertiary-bg);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 2rem;
+          font-weight: 600;
+          cursor: pointer;
+          position: relative;
+          overflow: hidden;
+      }
+
+      .profile-avatar img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+      }
+
+      .profile-avatar-input {
+          position: absolute;
+          width: 100%;
+          height: 100%;
+          opacity: 0;
+          cursor: pointer;
+      }
+
+      .profile-info {
+          flex: 1;
+      }
+
+      .profile-name-input {
+          width: 100%;
+          padding: var(--spacing-md);
+          background-color: var(--primary-bg);
+          border: 1px solid var(--tertiary-bg);
+          border-radius: var(--border-radius);
+          color: var(--text-color);
+          font-size: 1.1rem;
+          margin-bottom: var(--spacing-sm);
+      }
+
+      .stats-section {
+          background-color: var(--secondary-bg);
+          border-radius: var(--border-radius);
+          padding: var(--spacing-lg);
+      }
+
+      .stat-item {
+          display: flex;
+          justify-content: space-between;
+          padding: var(--spacing-md) 0;
+          border-bottom: 1px solid var(--tertiary-bg);
+      }
+
+      .stat-item:last-child {
+          border-bottom: none;
+      }
+
+      .stat-label {
+          color: var(--grey-text);
+      }
+
+      .stat-value {
+          font-weight: 600;
+      }
+
+      /* Utility Classes */
+      .hidden {
+          display: none !important;
+      }
+
+      .text-center {
+          text-align: center;
+      }
+
+      .mb-1 {
+          margin-bottom: var(--spacing-sm);
+      }
+
+      .mb-2 {
+          margin-bottom: var(--spacing-md);
+      }
+
+      .mb-3 {
+          margin-bottom: var(--spacing-lg);
+      }
+
+      /* Scrollbar Styling */
+      ::-webkit-scrollbar {
+          width: 6px;
+      }
+
+      ::-webkit-scrollbar-track {
+          background: var(--secondary-bg);
+      }
+
+      ::-webkit-scrollbar-thumb {
+          background: var(--tertiary-bg);
+          border-radius: 3px;
+      }
+
+      /* Responsive */
+      @media (min-width: 768px) {
+          #app {
+              max-width: 500px;
+              margin: 0 auto;
+              border-left: 1px solid var(--tertiary-bg);
+              border-right: 1px solid var(--tertiary-bg);
+          }
+      }
+#connect-btn {
+    margin-bottom: 10px;
+}
+#settings-page {
+    overflow-y: auto;
+}
+#vault-page {
+    overflow-y: auto;
+}
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <!-- Header -->
+      <div class="header">
+        <div class="logo-container">
+          <img
+            src="https://i.imgur.com/MXRKJST.png"
+            alt="Arch Logo"
+            class="logo"
+          />
+          <div class="app-name">Arch</div>
+        </div>
+      </div>
+
+      <!-- Main Content -->
+      <div class="main-content">
+        <!-- Share Page -->
+        <div id="share-page" class="page active">
+          <div class="share-options">
+            <div class="share-btn" id="send-btn">
+              <i data-lucide="arrow-up-left"></i>
+              <div class="share-btn-text">Send</div>
+              <div class="code-label">Create Code</div>
+            </div>
+
+            <div class="share-btn" id="receive-btn">
+              <i data-lucide="arrow-down-right"></i>
+              <div class="share-btn-text">Receive</div>
+              <div class="code-label">Input Code</div>
+            </div>
+          </div>
+
+          <!-- Connection Code Display -->
+          <div id="code-container" class="code-container">
+            <div class="code-label">Make sure both devices are connected to the same network.</div>
+            <div id="connection-code" class="connection-code">000000</div>
+            <button id="copy-code-btn" class="action-btn mb-1">
+              Copy Code
+            </button>
+            <button id="cancel-connection-btn" class="action-btn danger">
+              Cancel
+            </button>
+          </div>
+
+          <!-- Code Input -->
+          <div id="input-container" class="code-container">
+            <div class="code-label">Enter the code from the other device.</div>
+            <input
+              type="text"
+              id="code-input"
+              class="code-input"
+              maxlength="6"
+              placeholder="000000"
+            />
+            <button id="connect-btn" class="action-btn primary">Connect</button>
+            
+            <button id="cancel-input-btn" class="action-btn danger">
+              Cancel
+            </button>
+          </div>
+
+          <!-- Chat Interface -->
+          <div id="chat-container" class="chat-container">
+            <div class="chat-header">
+              <div class="peer-info">
+                <div class="peer-avatar" id="peer-avatar">U</div>
+                <div>
+                  <div id="peer-name">Unknown User</div>
+                  <div class="code-label" id="connection-status">Connected</div>
+                </div>
+              </div>
+              <button id="end-session-btn" class="action-btn danger">
+                End Session
+              </button>
+            </div>
+
+            <div id="messages-container" class="messages-container">
+              <!-- Messages will be added here dynamically -->
+              <div class="message received">
+                <div class="message-sender">System</div>
+                <div class="message-text">
+                  Welcome to Arch! You are now connected. Start sharing files or
+                  send a message.
+                </div>
+              </div>
+            </div>
+
+            <div class="chat-input-container">
+              <button id="file-attach-btn" class="file-attach-btn">
+                <i data-lucide="plus"></i>
+              </button>
+              <input
+                type="text"
+                id="chat-input"
+                class="chat-input"
+                placeholder="Type a message..."
+              />
+              <button id="chat-send-btn" class="chat-send-btn">
+                <i data-lucide="send"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Vault Page -->
+        <div id="vault-page" class="page">
+          <div class="vault-header">
+            <button id="images-tab" class="vault-tab active">Images</button>
+            <button id="other-tab" class="vault-tab">Other</button>
+          </div>
+
+          <div class="vault-content">
+            <div id="images-gallery" class="gallery">
+              <!-- Images will be added here dynamically -->
+              <div class="gallery-item empty">
+                <i data-lucide="image"></i>
+              </div>
+            </div>
+
+            <div id="other-gallery" class="gallery hidden">
+              <!-- Other files will be added here dynamically -->
+              <div class="gallery-item empty">
+                <i data-lucide="file"></i>
+              </div>
+            </div>
+          </div>
+
+          <button id="add-to-vault-btn" class="add-file-btn">
+            <i data-lucide="plus"></i>
+          </button>
+        </div>
+
+        <!-- Settings Page -->
+        <div id="settings-page" class="page">
+          <div class="profile-section">
+            <div class="profile-header">
+              <div class="profile-avatar" id="profile-avatar">
+                <span id="avatar-text">U</span>
+                <input
+                  type="file"
+                  id="avatar-input"
+                  class="profile-avatar-input"
+                  accept="image/*"
+                />
+              </div>
+              <div class="profile-info">
+                <input
+                  type="text"
+                  id="profile-name-input"
+                  class="profile-name-input"
+                  placeholder="Your Name"
+                  value="User"
+                />
+                <div class="code-label">This name will appear to others.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stats-section">
+            <h3 class="mb-2">Data</h3>
+            <div class="stat-item">
+              <div class="stat-label">Vault</div>
+              <div class="stat-value" id="vault-data">0 KB</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Sent</div>
+              <div class="stat-value" id="data-sent">0 KB</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Received</div>
+              <div class="stat-value" id="data-received">0 KB</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Files Sent</div>
+              <div class="stat-value" id="files-sent">0</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">Files Received</div>
+              <div class="stat-value" id="files-received">0</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Navigation -->
+      <div class="nav">
+                <button id="nav-vault" class="nav-btn">
+          <i data-lucide="cloud"></i>
+          <span>Vault</span>
+        </button>
+<button id="nav-share" class="nav-btn active">
+          <i data-lucide="inbox"></i>
+          <span>Share</span>
+        </button>
+        <button id="nav-settings" class="nav-btn">
+          <i data-lucide="settings"></i>
+          <span>Settings</span>
+        </button>
+      </div>
+
+      <!-- File Upload Modal -->
+      <div id="file-modal" class="modal-overlay">
+        <div class="modal">
+          <div class="modal-header">
+            <div class="modal-title">Select Files</div>
+            <button id="close-modal-btn" class="close-btn">
+              <i data-lucide="x"></i>
+            </button>
+          </div>
+          <div id="file-list" class="file-list">
+            <!-- Selected files will appear here -->
+          </div>
+          <input type="file" id="file-input" multiple style="display: none;" />
+          <button id="browse-files-btn" class="action-btn mb-1">
+            Browse Files
+          </button>
+          <button id="send-files-btn" class="action-btn primary">
+            Send Files
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // App state
+      const appState = {
+          currentPage: 'share',
+          peer: null,
+          connection: null,
+          userId: null,
+          peerId: null,
+          connectionCode: null,
+          connected: false,
+          profile: {
+              name: 'User',
+              avatar: null
+          },
+          vault: {
+              images: [],
+              other: []
+          },
+          stats: {
+              vaultData: 0,
+              dataSent: 0,
+              dataReceived: 0,
+              filesSent: 0,
+              filesReceived: 0
+          },
+          messages: [],
+          fileIcons: {
+              'pdf': 'file-text',
+              'doc': 'file-text',
+              'docx': 'file-text',
+              'txt': 'file-text',
+              'jpg': 'image',
+              'jpeg': 'image',
+              'png': 'image',
+              'gif': 'image',
+              'mp4': 'film',
+              'avi': 'film',
+              'mov': 'film',
+              'mp3': 'music',
+              'wav': 'music',
+              'zip': 'archive',
+              'rar': 'archive',
+              'exe': 'binary',
+              'default': 'file'
+          }
+      };
+
+      // DOM Elements
+      const pages = {
+          share: document.getElementById('share-page'),
+          vault: document.getElementById('vault-page'),
+          settings: document.getElementById('settings-page')
+      };
+
+      const navButtons = {
+          share: document.getElementById('nav-share'),
+          vault: document.getElementById('nav-vault'),
+          settings: document.getElementById('nav-settings')
+      };
+
+      // Initialize the app
+      document.addEventListener('DOMContentLoaded', () => {
+          // Initialize Lucide icons
+          lucide.createIcons();
+
+          // Load saved data from localStorage
+          loadSavedData();
+
+          // Initialize navigation
+          initNavigation();
+
+          // Initialize share page functionality
+          initSharePage();
+
+          // Initialize vault page functionality
+          initVaultPage();
+
+          // Initialize settings page functionality
+          initSettingsPage();
+
+          // Initialize file modal
+          initFileModal();
+
+          // Initialize PeerJS (but don't create peer until needed)
+          initPeerJS();
+
+          // Update stats display
+          updateStatsDisplay();
+      });
+
+      // Navigation functions
+      function initNavigation() {
+          Object.keys(navButtons).forEach(pageId => {
+              navButtons[pageId].addEventListener('click', () => {
+                  switchPage(pageId);
+              });
+          });
+      }
+
+      function switchPage(pageId) {
+          // Update active page
+          Object.keys(pages).forEach(id => {
+              pages[id].classList.remove('active');
+              navButtons[id].classList.remove('active');
+          });
+
+          pages[pageId].classList.add('active');
+          navButtons[pageId].classList.add('active');
+          appState.currentPage = pageId;
+
+          // Refresh vault display if switching to vault page
+          if (pageId === 'vault') {
+              refreshVaultDisplay();
+          }
+      }
+
+      // Share page functions
+      function initSharePage() {
+          const sendBtn = document.getElementById('send-btn');
+          const receiveBtn = document.getElementById('receive-btn');
+          const copyCodeBtn = document.getElementById('copy-code-btn');
+          const cancelConnectionBtn = document.getElementById('cancel-connection-btn');
+          const connectBtn = document.getElementById('connect-btn');
+          const cancelInputBtn = document.getElementById('cancel-input-btn');
+          const chatSendBtn = document.getElementById('chat-send-btn');
+          const chatInput = document.getElementById('chat-input');
+          const fileAttachBtn = document.getElementById('file-attach-btn');
+          const endSessionBtn = document.getElementById('end-session-btn');
+
+          sendBtn.addEventListener('click', startSharing);
+          receiveBtn.addEventListener('click', showCodeInput);
+          copyCodeBtn.addEventListener('click', copyConnectionCode);
+          cancelConnectionBtn.addEventListener('click', cancelSharing);
+          connectBtn.addEventListener('click', connectToPeer);
+          cancelInputBtn.addEventListener('click', cancelCodeInput);
+          chatSendBtn.addEventListener('click', sendMessage);
+          fileAttachBtn.addEventListener('click', openFileModal);
+          endSessionBtn.addEventListener('click', endSession);
+
+          chatInput.addEventListener('keypress', (e) => {
+              if (e.key === 'Enter') {
+                  sendMessage();
+              }
+          });
+      }
+
+      function startSharing() {
+          // Hide share options
+          document.querySelector('.share-options').style.display = 'none';
+
+          // Show code container
+          const codeContainer = document.getElementById('code-container');
+          codeContainer.classList.add('active');
+
+          // Generate a random 6-digit code
+          const code = Math.floor(100000 + Math.random() * 900000).toString();
+          appState.connectionCode = code;
+
+          // Display the code
+          document.getElementById('connection-code').textContent = code;
+
+          // Initialize PeerJS as host
+          initPeerAsHost(code);
+      }
+
+      function showCodeInput() {
+          // Hide share options
+          document.querySelector('.share-options').style.display = 'none';
+
+          // Show input container
+          document.getElementById('input-container').classList.add('active');
+      }
+
+      function cancelSharing() {
+          // Show share options
+          document.querySelector('.share-options').style.display = 'flex';
+
+          // Hide code container
+          document.getElementById('code-container').classList.remove('active');
+
+          // Reset connection
+          if (appState.peer) {
+              appState.peer.destroy();
+              appState.peer = null;
+          }
+          appState.connectionCode = null;
+          appState.connected = false;
+      }
+
+      function cancelCodeInput() {
+          // Show share options
+          document.querySelector('.share-options').style.display = 'flex';
+
+          // Hide input container
+          document.getElementById('input-container').classList.remove('active');
+
+          // Reset input
+          document.getElementById('code-input').value = '';
+      }
+
+      function copyConnectionCode() {
+          const code = document.getElementById('connection-code').textContent;
+          navigator.clipboard.writeText(code).then(() => {
+              const copyBtn = document.getElementById('copy-code-btn');
+              const originalText = copyBtn.textContent;
+              copyBtn.textContent = 'Copied!';
+              setTimeout(() => {
+                  copyBtn.textContent = originalText;
+              }, 2000);
+          });
+      }
+
+      function connectToPeer() {
+          const code = document.getElementById('code-input').value.trim();
+          if (code.length !== 6) {
+              alert('Please enter a valid 6-digit code');
+              return;
+          }
+
+          // Hide input container
+          document.getElementById('input-container').classList.remove('active');
+
+          // Initialize PeerJS as client
+          initPeerAsClient(code);
+      }
+
+      // PeerJS functions
+      function initPeerJS() {
+          // PeerJS will be initialized when needed (as host or client)
+      }
+
+      function initPeerAsHost(code) {
+          // Use the code as the peer ID
+          appState.peerId = code;
+
+          // Create a new peer with the code as ID
+          appState.peer = new Peer(code, {
+              host: '0.peerjs.com',
+              port: 443,
+              path: '/',
+              debug: 2
+          });
+
+          appState.peer.on('open', (id) => {
+              console.log('Peer connected as host with ID:', id);
+              appState.userId = id;
+          });
+
+          appState.peer.on('connection', (conn) => {
+              console.log('Connection received from:', conn.peer);
+              setupConnection(conn);
+          });
+
+          appState.peer.on('error', (err) => {
+              console.error('PeerJS error:', err);
+              alert('Connection error. Please try again.');
+              cancelSharing();
+          });
+      }
+
+      function initPeerAsClient(code) {
+          // Create a new peer with a random ID
+          appState.peer = new Peer({
+              host: '0.peerjs.com',
+              port: 443,
+              path: '/',
+              debug: 2
+          });
+
+          appState.peer.on('open', (id) => {
+              console.log('Peer connected as client with ID:', id);
+              appState.userId = id;
+
+              // Connect to the host using the code as peer ID
+              const conn = appState.peer.connect(code);
+              setupConnection(conn);
+          });
+
+          appState.peer.on('error', (err) => {
+              console.error('PeerJS error:', err);
+              alert('Connection error. Please check the code and try again.');
+              cancelCodeInput();
+          });
+      }
+
+      function setupConnection(conn) {
+          appState.connection = conn;
+
+          conn.on('open', () => {
+              console.log('Connection established with:', conn.peer);
+              appState.connected = true;
+              appState.peerId = conn.peer;
+
+              // Show chat interface
+              showChatInterface();
+
+              // Send user profile to peer
+              conn.send({
+                  type: 'profile',
+                  name: appState.profile.name,
+                  avatar: appState.profile.avatar
+              });
+          });
+
+          conn.on('data', (data) => {
+              handleIncomingData(data);
+          });
+
+          conn.on('close', () => {
+              console.log('Connection closed');
+              appState.connected = false;
+              addSystemMessage('Connection lost. Session ended.');
+              setTimeout(() => {
+                  hideChatInterface();
+              }, 3000);
+          });
+
+          conn.on('error', (err) => {
+              console.error('Connection error:', err);
+              addSystemMessage('Connection error occurred.');
+          });
+      }
+
+      function showChatInterface() {
+          // Hide share options and code containers
+          document.querySelector('.share-options').style.display = 'none';
+          document.getElementById('code-container').classList.remove('active');
+          document.getElementById('input-container').classList.remove('active');
+
+          // Show chat container
+          document.getElementById('chat-container').classList.add('active');
+
+          // Add connection message
+          addSystemMessage('Connected to peer. You can now share files and messages.');
+      }
+
+      function hideChatInterface() {
+          // Show share options
+          document.querySelector('.share-options').style.display = 'flex';
+
+          // Hide chat container
+          document.getElementById('chat-container').classList.remove('active');
+
+          // Clear messages
+          document.getElementById('messages-container').innerHTML = '';
+
+          // Reset connection state
+          if (appState.peer) {
+              appState.peer.destroy();
+              appState.peer = null;
+          }
+          appState.connection = null;
+          appState.connected = false;
+          appState.messages = [];
+      }
+
+      function endSession() {
+          if (appState.connection) {
+              appState.connection.close();
+          }
+          hideChatInterface();
+          addSystemMessage('Session ended.');
+      }
+
+      // Messaging functions
+      function sendMessage() {
+          const input = document.getElementById('chat-input');
+          const message = input.value.trim();
+
+          if (!message || !appState.connected || !appState.connection) return;
+
+          // Create message object
+          const messageObj = {
+              type: 'message',
+              text: message,
+              sender: appState.profile.name,
+              timestamp: new Date().toISOString()
+          };
+
+          // Send to peer
+          appState.connection.send(messageObj);
+
+          // Add to local messages
+          addMessage(messageObj, true);
+
+          // Clear input
+          input.value = '';
+          input.focus();
+
+          // Update stats
+          appState.stats.dataSent += message.length;
+          updateStatsDisplay();
+          saveData();
+      }
+
+      function handleIncomingData(data) {
+          switch (data.type) {
+              case 'message':
+                  addMessage(data, false);
+                  break;
+
+              case 'file':
+                  receiveFile(data);
+                  break;
+
+              case 'profile':
+                  updatePeerInfo(data);
+                  break;
+
+              default:
+                  console.log('Unknown data type:', data.type);
+          }
+      }
+
+      function addMessage(messageObj, isSent) {
+          // Add to messages array
+          appState.messages.push({
+              ...messageObj,
+              isSent: isSent
+          });
+
+          // Create message element
+          const messagesContainer = document.getElementById('messages-container');
+          const messageDiv = document.createElement('div');
+          messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+
+          if (messageObj.text) {
+              // Text message
+              messageDiv.innerHTML = `
+                  <div class="message-sender">${messageObj.sender}</div>
+                  <div class="message-text">${messageObj.text}</div>
+              `;
+          } else if (messageObj.file) {
+              // File message
+              const file = messageObj.file;
+              const fileExt = file.name.split('.').pop().toLowerCase();
+              const iconName = appState.fileIcons[fileExt] || appState.fileIcons.default;
+
+              messageDiv.innerHTML = `
+                  <div class="message-sender">${messageObj.sender}</div>
+                  <div class="message-file" data-file="${encodeURIComponent(JSON.stringify(file))}">
+                      <div class="file-info">
+                          <i data-lucide="${iconName}" class="file-icon"></i>
+                          <div class="file-details">
+                              <div class="file-name">${file.name.replace(/\.[^/.]+$/, "")}</div>
+                              <div class="file-type">${fileExt.toUpperCase()}</div>
+                          </div>
+                          <div class="file-size">${formatFileSize(file.size)}</div>
+                      </div>
+                  </div>
+              `;
+          }
+
+          messagesContainer.appendChild(messageDiv);
+
+          // Scroll to bottom
+          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+
+          // Re-initialize icons
+          lucide.createIcons();
+
+          // Add click handler for file downloads
+          if (messageObj.file) {
+              const fileElement = messageDiv.querySelector('.message-file');
+              fileElement.addEventListener('click', () => {
+                  downloadFile(messageObj.file);
+              });
+          }
+      }
+
+      function addSystemMessage(text) {
+          const messagesContainer = document.getElementById('messages-container');
+          const messageDiv = document.createElement('div');
+          messageDiv.className = 'message received';
+          messageDiv.innerHTML = `
+              <div class="message-sender">System</div>
+              <div class="message-text">${text}</div>
+          `;
+          messagesContainer.appendChild(messageDiv);
+          messagesContainer.scrollTop = messagesContainer.scrollHeight;
+      }
+
+      function updatePeerInfo(profile) {
+          document.getElementById('peer-name').textContent = profile.name || 'Unknown User';
+          const peerAvatar = document.getElementById('peer-avatar');
+          if (profile.avatar) {
+              peerAvatar.innerHTML = `<img src="${profile.avatar}" alt="Avatar">`;
+          } else {
+              peerAvatar.textContent = (profile.name || 'U').charAt(0).toUpperCase();
+          }
+      }
+
+      // File handling functions
+      function openFileModal() {
+          document.getElementById('file-modal').classList.add('active');
+      }
+
+      function initFileModal() {
+          const closeModalBtn = document.getElementById('close-modal-btn');
+          const browseFilesBtn = document.getElementById('browse-files-btn');
+          const sendFilesBtn = document.getElementById('send-files-btn');
+          const fileInput = document.getElementById('file-input');
+          const fileList = document.getElementById('file-list');
+
+          closeModalBtn.addEventListener('click', () => {
+              document.getElementById('file-modal').classList.remove('active');
+              fileList.innerHTML = '';
+          });
+
+          browseFilesBtn.addEventListener('click', () => {
+              fileInput.click();
+          });
+
+          fileInput.addEventListener('change', () => {
+              updateFileList(fileInput.files);
+          });
+
+          sendFilesBtn.addEventListener('click', sendSelectedFiles);
+      }
+
+      function updateFileList(files) {
+          const fileList = document.getElementById('file-list');
+          fileList.innerHTML = '';
+
+          for (let i = 0; i < files.length; i++) {
+              const file = files[i];
+              const fileItem = document.createElement('div');
+              fileItem.className = 'file-item';
+              fileItem.dataset.index = i;
+
+              const fileExt = file.name.split('.').pop().toLowerCase();
+              const iconName = appState.fileIcons[fileExt] || appState.fileIcons.default;
+
+              fileItem.innerHTML = `
+                  <div class="file-item-info">
+                      <i data-lucide="${iconName}"></i>
+                      <div>
+                          <div>${file.name}</div>
+                          <div class="file-type">${formatFileSize(file.size)}</div>
+                      </div>
+                  </div>
+                  <button class="remove-file-btn" data-index="${i}">
+                      <i data-lucide="x"></i>
+                  </button>
+              `;
+
+              fileList.appendChild(fileItem);
+          }
+
+          // Re-initialize icons
+          lucide.createIcons();
+
+          // Add event listeners to remove buttons
+          document.querySelectorAll('.remove-file-btn').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                  const index = e.target.closest('.remove-file-btn').dataset.index;
+                  removeFileFromList(index);
+              });
+          });
+      }
+
+      function removeFileFromList(index) {
+          // In a real implementation, you would remove the file from the FileList
+          // Since we can't modify FileList directly, we'll just clear and re-add
+          const fileInput = document.getElementById('file-input');
+          const dt = new DataTransfer();
+
+          for (let i = 0; i < fileInput.files.length; i++) {
+              if (i != index) {
+                  dt.items.add(fileInput.files[i]);
+              }
+          }
+
+          fileInput.files = dt.files;
+          updateFileList(fileInput.files);
+      }
+
+      function sendSelectedFiles() {
+          const fileInput = document.getElementById('file-input');
+          const files = fileInput.files;
+
+          if (files.length === 0) {
+              alert('Please select at least one file');
+              return;
+          }
+
+          if (!appState.connected || !appState.connection) {
+              alert('Not connected to a peer');
+              return;
+          }
+
+          // Process each file
+          for (let i = 0; i < files.length; i++) {
+              const file = files[i];
+              const reader = new FileReader();
+
+              reader.onload = (e) => {
+                  // Create file object for sending
+                  const fileObj = {
+                      type: 'file',
+                      file: {
+                          name: file.name,
+                          type: file.type,
+                          size: file.size,
+                          data: e.target.result
+                      },
+                      sender: appState.profile.name,
+                      timestamp: new Date().toISOString()
+                  };
+
+                  // Send to peer
+                  appState.connection.send(fileObj);
+
+                  // Add to local messages
+                  addMessage(fileObj, true);
+
+                  // Update stats
+                  appState.stats.filesSent++;
+                  appState.stats.dataSent += file.size;
+                  updateStatsDisplay();
+                  saveData();
+              };
+
+              reader.readAsDataURL(file);
+          }
+
+          // Close modal and reset
+          document.getElementById('file-modal').classList.remove('active');
+          fileInput.value = '';
+          document.getElementById('file-list').innerHTML = '';
+      }
+
+      function receiveFile(fileData) {
+          // Add to messages
+          addMessage(fileData, false);
+
+          // Update stats
+          appState.stats.filesReceived++;
+          appState.stats.dataReceived += fileData.file.size;
+          updateStatsDisplay();
+          saveData();
+
+          // Add to vault if it's an image
+          const fileExt = fileData.file.name.split('.').pop().toLowerCase();
+          const imageExtensions = ['jpg', 'jpeg', 'png', 'gif'];
+
+          if (imageExtensions.includes(fileExt)) {
+              addFileToVault(fileData.file, 'images');
+          } else {
+              addFileToVault(fileData.file, 'other');
+          }
+      }
+
+      function downloadFile(fileObj) {
+          // Convert data URL back to blob
+          const byteString = atob(fileObj.data.split(',')[1]);
+          const mimeString = fileObj.data.split(',')[0].split(':')[1].split(';')[0];
+          const ab = new ArrayBuffer(byteString.length);
+          const ia = new Uint8Array(ab);
+
+          for (let i = 0; i < byteString.length; i++) {
+              ia[i] = byteString.charCodeAt(i);
+          }
+
+          const blob = new Blob([ab], { type: mimeString });
+          const url = URL.createObjectURL(blob);
+
+          // Create download link
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileObj.name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+
+          // Clean up
+          setTimeout(() => URL.revokeObjectURL(url), 100);
+      }
+
+      // Vault functions
+      function initVaultPage() {
+          const imagesTab = document.getElementById('images-tab');
+          const otherTab = document.getElementById('other-tab');
+          const addToVaultBtn = document.getElementById('add-to-vault-btn');
+
+          imagesTab.addEventListener('click', () => {
+              imagesTab.classList.add('active');
+              otherTab.classList.remove('active');
+              document.getElementById('images-gallery').classList.remove('hidden');
+              document.getElementById('other-gallery').classList.add('hidden');
+          });
+
+          otherTab.addEventListener('click', () => {
+              otherTab.classList.add('active');
+              imagesTab.classList.remove('active');
+              document.getElementById('other-gallery').classList.remove('hidden');
+              document.getElementById('images-gallery').classList.add('hidden');
+          });
+
+          addToVaultBtn.addEventListener('click', () => {
+              // Create file input for vault
+              const fileInput = document.createElement('input');
+              fileInput.type = 'file';
+              fileInput.accept = '*/*';
+              fileInput.multiple = true;
+
+              fileInput.addEventListener('change', (e) => {
+                  const files = e.target.files;
+                  for (let i = 0; i < files.length; i++) {
+                      const file = files[i];
+                      const reader = new FileReader();
+
+                      reader.onload = (e) => {
+                          const fileObj = {
+                              name: file.name,
+                              type: file.type,
+                              size: file.size,
+                              data: e.target.result,
+                              date: new Date().toISOString()
+                          };
+
+                          // Determine if it's an image
+                          const fileExt = file.name.split('.').pop().toLowerCase();
+                          const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
+
+                          if (imageExtensions.includes(fileExt)) {
+                              addFileToVault(fileObj, 'images');
+                          } else {
+                              addFileToVault(fileObj, 'other');
+                          }
+                      };
+
+                      reader.readAsDataURL(file);
+                  }
+              });
+
+              fileInput.click();
+          });
+      }
+
+      function addFileToVault(fileObj, category) {
+          // Add to vault array
+          appState.vault[category].push(fileObj);
+
+          // Update vault data stat
+          appState.stats.vaultData += fileObj.size;
+
+          // Update display
+          refreshVaultDisplay();
+
+          // Save to localStorage
+          saveData();
+      }
+
+      function refreshVaultDisplay() {
+          // Clear galleries
+          document.getElementById('images-gallery').innerHTML = '';
+          document.getElementById('other-gallery').innerHTML = '';
+
+          // Display images
+          if (appState.vault.images.length === 0) {
+              document.getElementById('images-gallery').innerHTML = `
+                  <div class="gallery-item empty">
+                      <i data-lucide="image"></i>
+                  </div>
+              `;
+          } else {
+              appState.vault.images.forEach((file, index) => {
+                  const galleryItem = document.createElement('div');
+                  galleryItem.className = 'gallery-item';
+                  galleryItem.innerHTML = `<img src="${file.data}" alt="${file.name}">`;
+                  galleryItem.addEventListener('click', () => {
+                      downloadFile(file);
+                  });
+                  document.getElementById('images-gallery').appendChild(galleryItem);
+              });
+          }
+
+          // Display other files
+          if (appState.vault.other.length === 0) {
+              document.getElementById('other-gallery').innerHTML = `
+                  <div class="gallery-item empty">
+                      <i data-lucide="file"></i>
+                  </div>
+              `;
+          } else {
+              appState.vault.other.forEach((file, index) => {
+                  const fileExt = file.name.split('.').pop().toLowerCase();
+                  const iconName = appState.fileIcons[fileExt] || appState.fileIcons.default;
+
+                  const galleryItem = document.createElement('div');
+                  galleryItem.className = 'gallery-item';
+                  galleryItem.innerHTML = `
+                      <i data-lucide="${iconName}"></i>
+                      <div style="position: absolute; bottom: 5px; left: 5px; right: 5px; font-size: 0.7rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                          ${file.name.length > 15 ? file.name.substring(0, 12) + '...' : file.name}
+                      </div>
+                  `;
+                  galleryItem.addEventListener('click', () => {
+                      downloadFile(file);
+                  });
+                  document.getElementById('other-gallery').appendChild(galleryItem);
+              });
+          }
+
+          // Update stats display
+          updateStatsDisplay();
+
+          // Re-initialize icons
+          lucide.createIcons();
+      }
+
+      // Settings functions
+      function initSettingsPage() {
+          const profileNameInput = document.getElementById('profile-name-input');
+          const avatarInput = document.getElementById('avatar-input');
+          const profileAvatar = document.getElementById('profile-avatar');
+
+          // Load saved profile
+          profileNameInput.value = appState.profile.name;
+
+          if (appState.profile.avatar) {
+              profileAvatar.innerHTML = `
+                  <img src="${appState.profile.avatar}" alt="Avatar">
+                  <input type="file" id="avatar-input" class="profile-avatar-input" accept="image/*">
+              `;
+              document.getElementById('avatar-text').style.display = 'none';
+          }
+
+          profileNameInput.addEventListener('change', () => {
+              appState.profile.name = profileNameInput.value;
+              saveData();
+          });
+
+          avatarInput.addEventListener('change', (e) => {
+              const file = e.target.files[0];
+              if (file) {
+                  const reader = new FileReader();
+                  reader.onload = (e) => {
+                      appState.profile.avatar = e.target.result;
+                      profileAvatar.innerHTML = `
+                          <img src="${e.target.result}" alt="Avatar">
+                          <input type="file" id="avatar-input" class="profile-avatar-input" accept="image/*">
+                      `;
+                      document.getElementById('avatar-text').style.display = 'none';
+                      saveData();
+
+                      // Re-add event listener to the new input
+                      document.getElementById('avatar-input').addEventListener('change', (e) => {
+                          avatarInput.dispatchEvent(new Event('change'));
+                      });
+                  };
+                  reader.readAsDataURL(file);
+              }
+          });
+      }
+
+      // Utility functions
+      function formatFileSize(bytes) {
+          if (bytes === 0) return '0 Bytes';
+          const k = 1024;
+          const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+          const i = Math.floor(Math.log(bytes) / Math.log(k));
+          return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+      }
+
+      function updateStatsDisplay() {
+          document.getElementById('vault-data').textContent = formatFileSize(appState.stats.vaultData);
+          document.getElementById('data-sent').textContent = formatFileSize(appState.stats.dataSent);
+          document.getElementById('data-received').textContent = formatFileSize(appState.stats.dataReceived);
+          document.getElementById('files-sent').textContent = appState.stats.filesSent;
+          document.getElementById('files-received').textContent = appState.stats.filesReceived;
+      }
+
+      // Data persistence
+      function saveData() {
+          const data = {
+              profile: appState.profile,
+              vault: appState.vault,
+              stats: appState.stats
+          };
+          localStorage.setItem('arch-app-data', JSON.stringify(data));
+      }
+
+      function loadSavedData() {
+          const saved = localStorage.getItem('arch-app-data');
+          if (saved) {
+              try {
+                  const data = JSON.parse(saved);
+                  appState.profile = data.profile || appState.profile;
+                  appState.vault = data.vault || appState.vault;
+                  appState.stats = data.stats || appState.stats;
+              } catch (e) {
+                  console.error('Error loading saved data:', e);
+              }
+          }
+      }
+    </script>
+  </body>
+</html>

@@ -12,7 +12,7 @@
       type="image/x-icon"
       href="https://i.imgur.com/MXRKJST.png"
     />
-<link rel="manifest" href="https://epmcreations.github.io/arch/manifest.json">    <!-- Lucide Icons -->
+    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     <!-- PeerJS for P2P connections -->
     <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
@@ -1835,24 +1835,66 @@
           localStorage.setItem('arch-app-data', JSON.stringify(data));
       }
 
-      function loadSavedData() {
-          const saved = localStorage.getItem('arch-app-data');
-          if (saved) {
-              try {
-                  const data = JSON.parse(saved);
-                  appState.profile = data.profile || appState.profile;
-                  appState.vault = data.vault || appState.vault;
-                  appState.stats = data.stats || appState.stats;
-              } catch (e) {
-                  console.error('Error loading saved data:', e);
-                if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js')
-    .then(reg => console.log('Service Worker registered', reg))
-    .catch(err => console.log('Service Worker failed', err));
+function loadSavedData() {
+    const saved = localStorage.getItem('arch-app-data');
+    if (saved) {
+        try {
+            const data = JSON.parse(saved);
+            appState.profile = data.profile || appState.profile;
+            appState.vault = data.vault || appState.vault;
+            appState.stats = data.stats || appState.stats;
+            
+            // Update the UI with loaded profile
+            updateProfileUI();
+            
+        } catch (e) {
+            console.error('Error loading saved data:', e);
+        }
+    }
 }
-              }
-          }
-      }
+
+// NEW FUNCTION - Add this right after loadSavedData
+function updateProfileUI() {
+    // Update name input
+    const nameInput = document.getElementById('profile-name-input');
+    if (nameInput) {
+        nameInput.value = appState.profile.name || 'User';
+    }
+    
+    // Update avatar display
+    const avatarElement = document.getElementById('profile-avatar');
+    const avatarText = document.getElementById('avatar-text');
+    
+    if (appState.profile.avatar && avatarElement) {
+        avatarElement.innerHTML = `
+            <img src="${appState.profile.avatar}" alt="Avatar">
+            <input type="file" id="avatar-input" class="profile-avatar-input" accept="image/*">
+        `;
+        if (avatarText) avatarText.style.display = 'none';
+        
+        // Re-attach event listener
+        setTimeout(() => {
+            const newInput = document.getElementById('avatar-input');
+            if (newInput) {
+                newInput.addEventListener('change', handleAvatarChange);
+            }
+        }, 100);
+    }
+}
+
+// NEW FUNCTION - Add this too
+function handleAvatarChange(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            appState.profile.avatar = e.target.result;
+            saveData();
+            updateProfileUI();
+        };
+        reader.readAsDataURL(file);
+    }
+}
     </script>
   </body>
 </html>

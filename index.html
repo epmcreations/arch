@@ -12,6 +12,7 @@
       type="image/x-icon"
       href="https://i.imgur.com/MXRKJST.png"
     />
+    <link rel="manifest" href="/manifest.json">
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     <!-- PeerJS for P2P connections -->
@@ -1845,6 +1846,11 @@
                   appState.stats = data.stats || appState.stats;
               } catch (e) {
                   console.error('Error loading saved data:', e);
+                if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js')
+    .then(reg => console.log('Service Worker registered', reg))
+    .catch(err => console.log('Service Worker failed', err));
+}
               }
           }
       }

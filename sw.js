@@ -1,13 +1,13 @@
-// Basic service worker for PWA Builder
+// Empty service worker - just for PWA Builder
 self.addEventListener('install', event => {
-  console.log('Service Worker installing.');
+  // Skip waiting
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', event => {
-  console.log('Service Worker activating.');
+  // Claim clients
+  event.waitUntil(self.clients.claim());
 });
 
-self.addEventListener('fetch', event => {
-  // You can add caching strategies here
-  event.respondWith(fetch(event.request));
-});
+// DON'T intercept fetch requests for GitHub Pages
+// Leave fetch events alone
